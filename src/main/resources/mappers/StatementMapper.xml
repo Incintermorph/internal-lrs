@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.lrs.mapper.StatementMapper">
+
+  <insert id="insert" parameterType="map">
+    INSERT INTO lrs_statement
+    (id, stored, timestamp_utc, authority, actor, verb, object, result, context, attachments, full_statement, voided)
+    VALUES
+    (#{id}, CURRENT_TIMESTAMP(6), NULL,
+     NULL,
+     #{actorJson},
+     #{verbJson},
+     #{objectJson},
+     <choose>
+       <when test="resultJson != null">#{resultJson}</when>
+       <otherwise>NULL</otherwise>
+     </choose>,
+     <choose>
+       <when test="contextJson != null">#{contextJson}</when>
+       <otherwise>NULL</otherwise>
+     </choose>,
+     <choose>
+       <when test="attachmentsJson != null">#{attachmentsJson}</when>
+       <otherwise>NULL</otherwise>
+     </choose>,
+     #{fullStatement},
+     0)
+  </insert>
+
+  <select id="findById" parameterType="string" resultType="com.example.lrs.domain.Statement">
+    SELECT id, CAST(full_statement AS CHAR) AS fullStatement, verb_id AS verbId,
+           actor_account_name AS actorAccountName, activity_id AS activityId,
+           registration, voided, stored
+    FROM lrs_statement
+    WHERE id = #{id}
+  </select>
+
+  <select id="query" resultType="com.example.lrs.domain.Statement">
+    SELECT id, CAST(full_statement AS CHAR) AS fullStatement, verb_id AS verbId,
+           actor_account_name AS actorAccountName, activity_id AS ActivityId,
+           registration, voided, stored
+    FROM lrs_statement
+    WHERE 1=1
+      <if test="since != null">AND stored &gt;= #{since}</if>
+      <if test="verbId != null and verbId != ''">AND verb_id = #{verbId}</if>
+      <if test="activityId != null and activityId != ''">AND activity_id = #{activityId}</if>
+      <if test="registration != null and registration != ''">AND registration = #{registration}</if>
+    ORDER BY stored
+    LIMIT ${limit}
+  </select>
+
+</mapper>

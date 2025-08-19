@@ -1,0 +1,63 @@
+server:
+  port: 8080
+  tomcat:
+    uri-encoding: UTF-8
+    threads:
+      max: 200
+      min-spare: 10
+    accept-count: 100
+    relaxed-query-chars: "|,{,},[,],\\,^,`,\""
+    relaxed-path-chars: "|,{,},[,],\\,^,`,\""
+  compression:
+    enabled: true
+    mime-types: application/json, text/html, text/plain
+
+spring:
+  datasource:
+    # MySQL 설정 (실제 운영 시 사용)
+     url: jdbc:mysql://43.201.31.215:3306/test?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
+     username: nidsuser
+     password: "@intermorph1!!"
+     driver-class-name: com.mysql.cj.jdbc.Driver
+
+    # H2 인메모리 데이터베이스 설정 (테스트용)
+   # url: jdbc:h2:mem:lrs;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL
+   # username: sa
+   # password:
+   # driver-class-name: org.h2.Driver
+  jackson:
+    serialization:
+      WRITE_DATES_AS_TIMESTAMPS: false
+
+mybatis:
+   mapper-locations: classpath:/mappers/*.xml
+   configuration:
+     map-underscore-to-camel-case: true
+     default-statement-timeout: 5
+
+lrs:
+  auth:
+    basic:
+      username: admin
+      password: admin
+
+# 로깅 설정
+logging:
+  level:
+    root: INFO
+    "[com.example.lrs]": DEBUG
+    "[org.springframework.web]": DEBUG
+    "[org.mybatis]": DEBUG
+    "[org.springframework.security]": DEBUG
+    "[org.springframework.jdbc]": DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/application.log
+    max-size: 10MB
+    max-history: 30
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
