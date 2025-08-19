@@ -36,12 +36,20 @@ internal-lrs-full/
 └── README.md                       # 프로젝트 설명
 ```
 
-## 3. 빠른 시작 (H2 인메모리 데이터베이스 사용)
+## 3. 빠른 시작 (MySQL 데이터베이스 사용)
 
-### 3.1 프로젝트 클론 및 이동
+### 3.1 현재 디렉토리 확인
 ```bash
-cd c:\work\gemini\internal-lrs-full
+# 현재 디렉토리가 프로젝트 루트인지 확인
+pwd
+ls -la  # Windows에서는 dir
 ```
+
+현재 디렉토리에 다음 파일들이 있어야 합니다:
+- `pom.xml`
+- `src/` 디렉토리
+- `db/` 디렉토리
+- `README.md`
 
 ### 3.2 컴파일 및 실행
 ```bash
@@ -65,64 +73,69 @@ H2 console available at '/h2-console'
 
 - **메인 페이지**: http://localhost:8080
 - **헬스체크**: http://localhost:8080/health
-- **H2 콘솔**: http://localhost:8080/h2-console
+- **로그 확인**: http://localhost:8080/admin/logs/tail
+- **로그 통계**: http://localhost:8080/admin/logs/stats
 
-## 4. H2 데이터베이스 콘솔 접속
+## 4. 로그 모니터링
 
-### 4.1 H2 콘솔 설정
-1. 브라우저에서 http://localhost:8080/h2-console 접속
-2. 다음 정보로 로그인:
-   - **JDBC URL**: `jdbc:h2:mem:lrs`
-   - **User Name**: `sa`
-   - **Password**: (빈 값)
-
-### 4.2 테이블 확인
-로그인 후 다음 SQL로 테이블 구조를 확인할 수 있습니다:
-```sql
-SHOW TABLES;
-DESCRIBE lrs_statement;
-DESCRIBE lrs_document;
+### 4.1 로그 파일 위치
+로그 파일은 다음 위치에 생성됩니다:
+```
+./logs/application.log
 ```
 
-## 5. MySQL 데이터베이스 설정 (운영 환경)
+### 4.2 로그 API 엔드포인트
+- **로그 tail**: `GET /admin/logs/tail?lines=100&level=INFO`
+- **로그 검색**: `GET /admin/logs/search?query=ERROR&maxResults=50`
+- **로그 통계**: `GET /admin/logs/stats`
+- **테스트 로그**: `POST /admin/logs/test?level=INFO&message=test`
 
-### 5.1 MySQL 데이터베이스 생성
-```sql
-CREATE DATABASE lrs CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'lrs_user'@'localhost' IDENTIFIED BY 'lrs_pass';
-GRANT ALL PRIVILEGES ON lrs.* TO 'lrs_user'@'localhost';
-FLUSH PRIVILEGES;
+### 4.3 로그 레벨 설정
+`src/main/resources/application.yml`에서 로그 레벨을 조정할 수 있습니다:
+```yaml
+logging:
+  level:
+    "[com.example.lrs]": DEBUG  # 애플리케이션 로그
+    "[org.springframework.web]": DEBUG  # Spring Web 로그
+    "[org.mybatis]": DEBUG  # MyBatis 로그
 ```
 
-### 5.2 스키마 생성
+## 5. MySQL 데이터베이스 설정 (현재 설정)
+
+### 5.1 현재 데이터베이스 설정
+현재 애플리케이션은 다음 MySQL 데이터베이스에 연결되어 있습니다:
+- **호스트**: 43.201.31.215:3306
+- **데이터베이스**: test
+- **사용자**: nidsuser
+
+### 5.2 스키마 확인
+데이터베이스 스키마는 `db/schema.sql` 파일에 정의되어 있습니다:
 ```bash
-mysql -u lrs_user -p lrs < db/schema.sql
+# 스키마 파일 확인
+cat db/schema.sql
+
+# MySQL에 직접 연결하여 테이블 확인
+mysql -h 43.201.31.215 -u nidsuser -p test
 ```
 
-### 5.3 application.yml 설정 변경
-`src/main/resources/application.yml` 파일에서 MySQL 설정을 활성화:
-
+### 5.3 현재 application.yml 설정
 ```yaml
 spring:
   datasource:
-    # H2 설정 주석 처리
-    # url: jdbc:h2:mem:lrs;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL
-    # username: sa
-    # password: 
-    # driver-class-name: org.h2.Driver
-    
-    # MySQL 설정 활성화
-    url: jdbc:mysql://localhost:3306/lrs?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: lrs_user
-    password: lrs_pass
+    url: jdbc:mysql://43.201.31.215:3306/test?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
+    username: nidsuser
+    password: "@intermorph1!!"
     driver-class-name: com.mysql.cj.jdbc.Driver
-  
-  # H2 콘솔 비활성화
-  # h2:
-  #   console:
-  #     enabled: true
 
-# MyBatis 설정 활성화
+  # 서버 최적화 설정
+  tomcat:
+    uri-encoding: UTF-8
+    threads:
+      max: 200
+      min-spare: 10
+    accept-count: 100
+
+# MyBatis 설정
 mybatis:
   mapper-locations: classpath:/mappers/*.xml
   configuration:
@@ -130,38 +143,47 @@ mybatis:
     default-statement-timeout: 5
 ```
 
-## 6. xAPI 기능 활성화
+## 6. xAPI 기능 (현재 활성화됨)
 
-현재 xAPI Statement와 Activity State API가 비활성화되어 있습니다. 활성화하려면:
+xAPI Statement와 Activity State API가 현재 활성화되어 있습니다.
 
-### 6.1 컨트롤러 활성화
-1. `StatementsController.java`에서 주석 제거:
-   ```java
-   @RestController
-   @RequestMapping("/xapi/statements")
-   @RequiredArgsConstructor
-   public class StatementsController {
-   ```
+### 6.1 활성화된 컨트롤러
+- `StatementsController.java` - xAPI Statement 관리
+- `ActivitiesStateController.java` - Activity State 관리
+- `LogController.java` - 로그 모니터링
 
-2. `ActivitiesStateController.java`에서 주석 제거:
-   ```java
-   @RestController
-   @RequestMapping("/xapi/activities/state")
-   @RequiredArgsConstructor
-   public class ActivitiesStateController {
-   ```
+### 6.2 MyBatis 매퍼 파일
+다음 매퍼 파일들이 활성화되어 있습니다:
+- `src/main/resources/mappers/StatementMapper.xml`
+- `src/main/resources/mappers/DocumentMapper.xml`
 
-### 6.2 MyBatis 매퍼 파일 복구
-`src/main/resources/mappers/` 디렉토리에 XML 매퍼 파일들을 복구해야 합니다.
+### 6.3 현재 디렉토리 구조
+```
+./
+├── src/main/java/com/example/lrs/
+│   ├── api/                    # REST API 컨트롤러
+│   │   ├── StatementsController.java
+│   │   ├── ActivitiesStateController.java
+│   │   ├── HealthController.java
+│   │   └── LogController.java
+│   ├── service/               # 비즈니스 로직
+│   ├── mapper/               # MyBatis 매퍼 인터페이스
+│   └── config/               # 설정 클래스
+├── src/main/resources/
+│   ├── application.yml       # 애플리케이션 설정
+│   └── mappers/             # MyBatis XML 매퍼
+├── logs/                    # 로그 파일
+├── db/                     # 데이터베이스 스키마
+└── target/                 # 빌드 결과물
+```
 
 ## 7. API 엔드포인트
 
 ### 7.1 현재 활성화된 엔드포인트
 - `GET /` - 메인 페이지 (애플리케이션 정보)
 - `GET /health` - 헬스체크
-- `GET /h2-console` - H2 데이터베이스 콘솔
 
-### 7.2 xAPI 엔드포인트 (활성화 후 사용 가능)
+### 7.2 xAPI 엔드포인트 (현재 사용 가능)
 - `POST /xapi/statements` - Statement 생성
 - `PUT /xapi/statements?statementId=UUID` - Statement 업데이트
 - `GET /xapi/statements` - Statement 조회
@@ -169,6 +191,12 @@ mybatis:
 - `PUT/POST /xapi/activities/state` - Activity State 관리
 - `GET /xapi/activities/state` - Activity State 조회
 - `DELETE /xapi/activities/state` - Activity State 삭제
+
+### 7.3 관리자 엔드포인트
+- `GET /admin/logs/tail` - 로그 tail 조회
+- `GET /admin/logs/search` - 로그 검색
+- `GET /admin/logs/stats` - 로그 통계
+- `POST /admin/logs/test` - 테스트 로그 생성
 
 ## 8. 인증 설정
 
@@ -178,12 +206,13 @@ xAPI 엔드포인트는 Basic Authentication을 사용합니다:
 - **기본 비밀번호**: `admin`
 
 ### 8.2 인증 정보 변경
-`application.yml`에서 인증 정보를 변경할 수 있습니다:
+`src/main/resources/application.yml`에서 인증 정보를 변경할 수 있습니다:
 ```yaml
 lrs:
   auth:
-    username: your_username
-    password: your_password
+    basic:
+      username: your_username
+      password: your_password
 ```
 
 ## 9. 문제 해결
@@ -198,14 +227,32 @@ server:
 ### 9.2 메모리 부족
 JVM 힙 메모리 증가:
 ```bash
+# Linux/Mac
 export MAVEN_OPTS="-Xmx2g"
+mvn spring-boot:run
+
+# Windows
+set MAVEN_OPTS=-Xmx2g
 mvn spring-boot:run
 ```
 
 ### 9.3 데이터베이스 연결 오류
 - MySQL 서버가 실행 중인지 확인
+- 네트워크 연결 확인 (43.201.31.215:3306)
 - 데이터베이스 사용자 권한 확인
 - 방화벽 설정 확인
+
+### 9.4 로그 파일 확인
+```bash
+# 로그 디렉토리 확인
+ls -la logs/
+
+# 실시간 로그 확인
+tail -f logs/application.log
+
+# 에러 로그만 확인
+grep ERROR logs/application.log
+```
 
 ## 10. 개발 환경 설정
 
@@ -215,24 +262,35 @@ mvn spring-boot:run
 - **VS Code**: Java Extension Pack 설치 후 폴더 열기
 
 ### 10.2 로그 레벨 설정
-`application.yml`에서 로그 레벨 조정:
+`src/main/resources/application.yml`에서 로그 레벨 조정:
 ```yaml
 logging:
   level:
-    com.example.lrs: DEBUG
-    org.springframework: INFO
+    "[com.example.lrs]": DEBUG
+    "[org.springframework.web]": DEBUG
+    "[org.mybatis]": DEBUG
+  file:
+    name: logs/application.log
 ```
 
 ## 11. 배포 가이드
 
 ### 11.1 JAR 파일 생성
 ```bash
+# 현재 디렉토리에서 실행
 mvn clean package
+
+# 생성된 JAR 파일 확인
+ls -la target/internal-lrs-0.2.0.jar
 ```
 
 ### 11.2 JAR 파일 실행
 ```bash
+# 현재 디렉토리에서 실행
 java -jar target/internal-lrs-0.2.0.jar
+
+# 또는 백그라운드 실행
+nohup java -jar target/internal-lrs-0.2.0.jar > logs/app.log 2>&1 &
 ```
 
 ### 11.3 프로덕션 설정

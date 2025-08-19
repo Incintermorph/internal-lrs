@@ -35,32 +35,39 @@ curl http://localhost:8080/
 }
 ```
 
-## 2. H2 데이터베이스 테스트
+## 2. 로그 모니터링 테스트
 
-### 2.1 H2 콘솔 접속
-1. 브라우저에서 http://localhost:8080/h2-console 접속
-2. 연결 정보:
-   - **JDBC URL**: `jdbc:h2:mem:lrs`
-   - **User Name**: `sa`
-   - **Password**: (빈 값)
+### 2.1 로그 API 테스트
+```bash
+# 로그 tail 조회 (최근 100줄)
+curl http://localhost:8080/admin/logs/tail?lines=100
 
-### 2.2 테이블 구조 확인
-```sql
--- 테이블 목록 확인
-SHOW TABLES;
+# 특정 레벨 로그만 조회
+curl http://localhost:8080/admin/logs/tail?lines=50&level=ERROR
 
--- Statement 테이블 구조 확인
-DESCRIBE lrs_statement;
+# 로그 검색
+curl "http://localhost:8080/admin/logs/search?query=ERROR&maxResults=20"
 
--- Document 테이블 구조 확인  
-DESCRIBE lrs_document;
+# 로그 통계
+curl http://localhost:8080/admin/logs/stats
 
--- 샘플 데이터 확인
-SELECT COUNT(*) FROM lrs_statement;
-SELECT COUNT(*) FROM lrs_document;
+# 테스트 로그 생성
+curl -X POST "http://localhost:8080/admin/logs/test?level=ERROR&message=Test%20error%20message"
 ```
 
-## 3. xAPI 기능 테스트 (활성화 후)
+### 2.2 로그 파일 직접 확인
+```bash
+# 현재 디렉토리에서 로그 파일 확인
+ls -la logs/
+
+# 실시간 로그 모니터링
+tail -f logs/application.log
+
+# 에러 로그만 필터링
+grep ERROR logs/application.log | tail -20
+```
+
+## 3. xAPI 기능 테스트 (현재 활성화됨)
 
 ### 3.1 Basic Authentication 설정
 모든 xAPI 요청에는 Basic Authentication이 필요합니다:
@@ -261,45 +268,65 @@ curl -X POST http://localhost:8080/xapi/statements \
 
 ### 7.1 애플리케이션 로그 확인
 ```bash
+# 현재 디렉토리에서 로그 확인
+ls -la logs/
+
 # 실시간 로그 확인
 tail -f logs/application.log
 
 # 에러 로그만 확인
 grep ERROR logs/application.log
+
+# 특정 시간대 로그 확인
+grep "2025-08-19 10:" logs/application.log
+
+# 로그 파일 크기 확인
+du -h logs/application.log
 ```
 
-### 7.2 액세스 로그 분석
+### 7.2 로그 API를 통한 분석
 ```bash
-# 요청 빈도 분석
-awk '{print $1}' access.log | sort | uniq -c | sort -nr
+# API를 통한 로그 통계
+curl http://localhost:8080/admin/logs/stats | jq
 
-# 응답 시간 분석
-awk '{print $NF}' access.log | sort -n
+# 특정 키워드 검색
+curl "http://localhost:8080/admin/logs/search?query=Statement&maxResults=10" | jq
+
+# 에러 로그만 조회
+curl "http://localhost:8080/admin/logs/tail?level=ERROR&lines=50" | jq
 ```
 
 ## 8. 데이터베이스 성능 테스트
 
-### 8.1 쿼리 성능 확인
+### 8.1 현재 데이터베이스 연결 확인
+```bash
+# MySQL 연결 테스트
+mysql -h 43.201.31.215 -u nidsuser -p test -e "SELECT COUNT(*) FROM lrs_statement;"
+
+# 테이블 구조 확인
+mysql -h 43.201.31.215 -u nidsuser -p test -e "DESCRIBE lrs_statement;"
+```
+
+### 8.2 쿼리 성능 확인
 ```sql
+-- 현재 데이터베이스에서 실행
 -- Statement 조회 성능
 EXPLAIN SELECT * FROM lrs_statement WHERE verb_id = 'http://adlnet.gov/expapi/verbs/experienced';
 
 -- 인덱스 사용률 확인
 SHOW INDEX FROM lrs_statement;
+
+-- 테이블 상태 확인
+SHOW TABLE STATUS LIKE 'lrs_statement';
 ```
 
-### 8.2 대용량 데이터 테스트
-```sql
--- 대량 Statement 생성 (테스트용)
-INSERT INTO lrs_statement (id, actor, verb, object, full_statement, voided) 
-SELECT 
-  CONCAT('test-', LPAD(seq, 10, '0')),
-  '{"name":"Test User"}',
-  '{"id":"http://test.com/verb"}', 
-  '{"id":"http://test.com/activity"}',
-  '{"actor":{"name":"Test User"},"verb":{"id":"http://test.com/verb"},"object":{"id":"http://test.com/activity"}}',
-  0
-FROM (SELECT @row := @row + 1 as seq FROM (SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3) t1, (SELECT @row := 0) r LIMIT 1000) numbers;
+### 8.3 애플리케이션 로그를 통한 성능 모니터링
+```bash
+# 데이터베이스 관련 로그 확인
+grep -i "mysql\|hikari\|statement" logs/application.log
+
+# 쿼리 실행 시간 로그 확인
+grep -i "query\|select\|insert" logs/application.log
 ```
 
 이 가이드를 통해 Internal LRS의 모든 기능을 체계적으로 테스트할 수 있습니다.
